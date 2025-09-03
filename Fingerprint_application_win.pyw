@@ -4,7 +4,6 @@ from tkinter import font
 from tkinter import ttk
 from tkinter import messagebox
 import cv2
-from pygrabber.dshow_graph import FilterGraph
 from PIL import Image, ImageTk
 import subprocess
 import threading
@@ -60,8 +59,8 @@ class MyGUI(tki.Tk):
         self.worker_thread.start()
 
         # Creates a list of Camera names
-        self.graph = FilterGraph()
-        self.cameras = self.graph.get_input_devices()
+        # self.graph = FilterGraph()
+        # self.cameras = self.graph.get_input_devices()
         
         # Open Camera (Second argument describes backend)
         camera_index = find_arducam_index()
@@ -69,7 +68,7 @@ class MyGUI(tki.Tk):
         
         self.cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW) # cv2.CAP_V4L2 for linux, cv2.CAP_DSHOW for windows testing
         if not self.cap.isOpened():
-            print('Could not find Camera.')
+            messagebox.showerror("Error",'Could not open Camera.')
         else:
             self.current_camera = 0
 
@@ -119,17 +118,17 @@ class MyGUI(tki.Tk):
         self.finger_cb.grid(row=2,column=1)
         self.finger_next.grid(row=2,column=2)
 
-        self.camera_options_label = tki.Label(self.top_frame,text="Set Camera")
-        self.camera_options_cb = ttk.Combobox(self.top_frame, values=self.cameras)
-        self.connect_button = tki.Button(self.top_frame,
-                                         text='Connect',
-                                         font=self.top_button_font,
-                                         command=lambda: self.task_queue.put('set_camera')
-                                         )
+        # self.camera_options_label = tki.Label(self.top_frame,text="Set Camera")
+        # self.camera_options_cb = ttk.Combobox(self.top_frame, values=self.cameras)
+        # self.connect_button = tki.Button(self.top_frame,
+        #                                  text='Connect',
+        #                                  font=self.top_button_font,
+        #                                  command=lambda: self.task_queue.put('set_camera')
+        #                                  )
         
-        self.camera_options_label.grid(row=3,column=0,sticky='w')
-        self.camera_options_cb.grid(row=3,column=1)
-        self.connect_button.grid(row=3,column=2)
+        # self.camera_options_label.grid(row=3,column=0,sticky='w')
+        # self.camera_options_cb.grid(row=3,column=1)
+        # self.connect_button.grid(row=3,column=2)
 
         self.duplicate_var = tki.BooleanVar()
         self.duplicate_checkbox = tki.Checkbutton(self.top_frame, text="Allow duplicate finger pictures",variable=self.duplicate_var,onvalue=1,offvalue=0)
@@ -240,12 +239,12 @@ class MyGUI(tki.Tk):
     #     print(f"Open Camera Time: {time.process_time() - t}")
 
     def take_photo(self):
-        t = time.process_time()
+
         self.capture_button.configure(command=self.do_nothing)
 
 
         # Pause Preview
-        photo_s = time.perf_counter()
+        
         self.preview_running = False
         
 
@@ -259,8 +258,8 @@ class MyGUI(tki.Tk):
             messagebox.showerror("Error", "Could not capture frame from camera.")
             return
         
-        photo_e = time.perf_counter()
-        print(f'photo capture: {photo_e - photo_s}')
+      
+
         
         self.capture_button.configure(text='Processing...')
         
@@ -344,7 +343,8 @@ class MyGUI(tki.Tk):
         
         self.duplicate = False
         self.after(0,self.capture_button.configure(command=lambda: threading.Thread(target=self.take_photo).start()))
-        print(f"Take photo Time: {time.process_time() - t}")
+    
+    
 
     # Gets the next free ID
     def next_free(self):
@@ -476,32 +476,32 @@ class MyGUI(tki.Tk):
         print(f'Total Time: {total_e - total_s}')
         return inverted
     
-    def set_camera(self):
-        camera = self.camera_options_cb.get()
-        for i in range(len(self.cameras)):
-            if self.cameras[i] == camera:
-                camera_index = i
+    # def set_camera(self):
+    #     camera = self.camera_options_cb.get()
+    #     for i in range(len(self.cameras)):
+    #         if self.cameras[i] == camera:
+    #             camera_index = i
 
-        if camera_index == self.current_camera:
-            return
+    #     if camera_index == self.current_camera:
+    #         return
         
-        if 'Virtual' in self.cameras[camera_index]:
-            messagebox.showinfo("Invalid Camera", "Please select a valid Camera.")
-            return
+    #     if 'Virtual' in self.cameras[camera_index]:
+    #         messagebox.showinfo("Invalid Camera", "Please select a valid Camera.")
+    #         return
         
-        self.preview_running = False
-        self.cap.release()
-        self.cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
+    #     self.preview_running = False
+    #     self.cap.release()
+    #     self.cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
         
-        if not self.cap.isOpened():
-            messagebox.showinfo("Camera not found", "The selected Camera has not been found.")
-        else:
-            self.current_camera = camera_index
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, PICTURE_RES[1]) 
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PICTURE_RES[0]) 
+    #     if not self.cap.isOpened():
+    #         messagebox.showinfo("Camera not found", "The selected Camera has not been found.")
+    #     else:
+    #         self.current_camera = camera_index
+    #         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, PICTURE_RES[1]) 
+    #         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PICTURE_RES[0]) 
         
-        self.preview_running = True
-        self.open_camera()
+    #     self.preview_running = True
+    #     self.open_camera()
     
     def worker(self):
         while self.worker_running:
@@ -511,8 +511,8 @@ class MyGUI(tki.Tk):
                 continue
             if task == 'take_photo':
                 self.take_photo()
-            elif task == 'set_camera':
-                self.set_camera()
+            # elif task == 'set_camera':
+            #     self.set_camera()
             self.task_queue.task_done()
     
     def initialize_rembg(self):
