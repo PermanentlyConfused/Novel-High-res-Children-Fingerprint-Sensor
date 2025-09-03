@@ -12,11 +12,9 @@ import queue
 import datetime
 import time
 import os
-import numpy as np
 from rembg import remove
 from rembg.bg import new_session
 import sys
-
 
 DATA_FILEPATH = os.path.join(os.environ["USERPROFILE"], "Documents", "FingerprintCapture", "Fingerprint_Data")
 LOG_FILEPATH = os.path.join(os.environ["USERPROFILE"], "Documents", "FingerprintCapture", "fingerprint_log.csv") # date,name,id,finger '
@@ -30,14 +28,26 @@ FPS = 10
 dependencies: rembg[cpu] numpy opencv-python pillow
 '''
 
-class MyGUI():
+def find_arducam_index() -> int | None:
+    from cv2_enumerate_cameras import enumerate_cameras
+    for camera_info in enumerate_cameras():
+        if camera_info.name == "Arducam_16MP":
+            return(int(str(camera_info.index)[-1]))
+    return None
+        
+        
+class MyGUI(tki.Tk):
     def __init__(self):
         # Create main window
-        self.root = tki.Tk()
+        super().__init__()
+        self.preview_running = True # Determines if preview is playing or not
+        self.duplicate = False
+        self.latest_frame = None
+        
 
         # Set window size and title
-        self.root.geometry('1350x770') 
-        self.root.title(string='Fingerprint Capture')
+        self.geometry('1350x770') 
+        self.title(string='Fingerprint Capture')
 
         # Fonts
         self.button_font = font.Font(family='Helvetica', size=35, weight='bold')
@@ -54,14 +64,14 @@ class MyGUI():
         self.cameras = self.graph.get_input_devices()
         
         # Open Camera (Second argument describes backend)
-        self.cap = cv2.VideoCapture(0, cv2.CAP_DSHOW) # cv2.CAP_V4L2 for linux, cv2.CAP_DSHOW for windows testing
+        camera_index = find_arducam_index()
+        messagebox.showerror("Error", "Fingerprint Scanner NOT detected.") if not camera_index else None
+        
+        self.cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW) # cv2.CAP_V4L2 for linux, cv2.CAP_DSHOW for windows testing
         if not self.cap.isOpened():
             print('Could not find Camera.')
         else:
             self.current_camera = 0
-
-        self.preview_running = True # Determines if preview is playing or not
-        self.duplicate = False
 
         # Set Camera settings
         self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
@@ -75,7 +85,7 @@ class MyGUI():
         self.initialize_rembg()
 
         ## Top Frame ##
-        self.top_frame = tki.Frame(self.root)
+        self.top_frame = tki.Frame(self)
         self.top_frame.pack(side='top',anchor='w', padx=20,pady=10)
         
         self.name_label = tki.Label(self.top_frame, text="Name")
@@ -127,7 +137,7 @@ class MyGUI():
 
 
         ## Middle Frame ##
-        self.middle_frame = tki.Frame(self.root)
+        self.middle_frame = tki.Frame(self)
         self.middle_frame.pack(side='top', pady=10)
 
         self.camera_frame = tki.Frame(self.middle_frame)
@@ -141,7 +151,7 @@ class MyGUI():
         self.image_label.pack()
 
         ## Bottom Frame ##
-        self.bottom_frame = tki.Frame(self.root)
+        self.bottom_frame = tki.Frame(self)
         self.bottom_frame.pack(side='top',pady=10)
 
         self.capture_button = tki.Button(self.bottom_frame,
@@ -155,43 +165,82 @@ class MyGUI():
         self.metric_label.grid(row=0,column=1,padx=40,pady=20)
 
         # Open Camera and turn on LEDs
-        self.open_camera()
+        self.frame_lock = threading.Lock()
+        self.preview_thread = threading.Thread(target=self.camera_preview_loop, daemon=True)
+        self.preview_thread.start()
+        self.update_gui_preview() 
+        # self.open_camera()
         
-        self.root.protocol('WM_DELETE_WINDOW',self.on_closing)
-        self.root.mainloop()
+    def camera_preview_loop(self):
+        """This function will be called to read from the camera's stream by a separate thread
+        """
+        while self.preview_running and self.cap.isOpened():
+            ret, frame = self.cap.read()
+            if not ret:
+                continue    
 
-    def open_camera(self):
+            with self.frame_lock:
+                self.latest_frame = frame.copy()    
 
-        # Will pause preview
+            time.sleep(1 / FPS)
+        
+    def update_gui_preview(self):
+        """This function is called every 100ms by a separate thread to update image on the main GUI
+        """
         if not self.preview_running:
             return
+
+        frame = None
+        with self.frame_lock:
+            if self.latest_frame is not None:
+                frame = self.latest_frame.copy()
+
+        if frame is not None:
+            opencv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            image = Image.fromarray(opencv_image)
+            image.thumbnail(VIDEO_RES, Image.Resampling.LANCZOS)
+            photo_image = ImageTk.PhotoImage(image=image)
+
+            self.camera_label.photo_image = photo_image
+            self.camera_label.configure(image=photo_image)
+
+        self.after(50, self.update_gui_preview)
+    # def open_camera(self):
+    #     """This Function grabs the latest frame from the camera and downscales it to 640x480px to be displayed
+    #     on the TKinter GUI.
+    #     """
+    #     t = time.process_time()
+    #     if not self.preview_running:
+    #         return
         
-        if self.cap.get(cv2.CAP_PROP_FOCUS) != 1023:
-            self.cap.set(cv2.CAP_PROP_FOCUS, 1023)
+    #     if self.cap.get(cv2.CAP_PROP_FOCUS) != 1023:
+    #         self.cap.set(cv2.CAP_PROP_FOCUS, 1023)
 
-        # Read frame
-        _, frame = self.cap.read()
+    #     # Read frame
+    #     _, frame = self.cap.read()
 
-        # Process frame to be shown
-        opencv_image = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-        captured_image = Image.fromarray(opencv_image)
-        photo_image = ImageTk.PhotoImage(image=captured_image)
+    #     # Process frame to be shown
+    #     opencv_image = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
+    #     captured_image = Image.fromarray(opencv_image)
+    #     photo_image = ImageTk.PhotoImage(image=captured_image)
 
-        small_image = captured_image.copy()
+    #     small_image = captured_image.copy()
 
-        small_image.thumbnail(VIDEO_RES, Image.Resampling.LANCZOS)
-        photo_image = ImageTk.PhotoImage(small_image)
-        # cv2.imshow("balls", np.array(small_image))
-        # cv2.waitKey(0)
+    #     small_image.thumbnail(VIDEO_RES, Image.Resampling.LANCZOS)
+    #     photo_image = ImageTk.PhotoImage(small_image)
+    #     # cv2.imshow("balls", np.array(small_image))
+    #     # cv2.waitKey(0)
 
-        # Put it on the label
-        self.camera_label.photo_image = photo_image
-        self.camera_label.configure(image=photo_image)
+    #     # Put it on the label
+    #     self.camera_label.photo_image = photo_image
+    #     self.camera_label.configure(image=photo_image)
 
-        # Repeat after 10 ms
-        self.camera_label.after(10, self.open_camera)
+    #     # Repeat after 10 ms
+    #     self.camera_label.after(500, self.open_camera)
+    #     print(f"Open Camera Time: {time.process_time() - t}")
 
     def take_photo(self):
+        t = time.process_time()
         self.capture_button.configure(command=self.do_nothing)
 
 
@@ -199,12 +248,17 @@ class MyGUI():
         photo_s = time.perf_counter()
         self.preview_running = False
         
+
+        self.cap.set(cv2.CAP_PROP_AUTOFOCUS,0)
+        self.cap.set(cv2.CAP_PROP_FOCUS,1023)
         
-        # Take frame (flush 4 keep last)
-        for _ in range(5):
-            self.cap.set(cv2.CAP_PROP_AUTOFOCUS,0)
-            self.cap.set(cv2.CAP_PROP_FOCUS,1023)
-            ret, frame = self.cap.read()
+        with self.frame_lock:
+            frame = self.latest_frame.copy() if self.latest_frame is not None else None
+
+        if frame is None:
+            messagebox.showerror("Error", "Could not capture frame from camera.")
+            return
+        
         photo_e = time.perf_counter()
         print(f'photo capture: {photo_e - photo_s}')
         
@@ -212,8 +266,6 @@ class MyGUI():
         
         # Turn preview back on
         self.preview_running = True
-        self.open_camera()
-
 
         name = self.name_entry.get()
         id = str(self.id_entry.get())
@@ -262,13 +314,13 @@ class MyGUI():
 
             if not 'Error' in result.stdout:
                 nfiq2_score = result.stdout.strip()
-                self.root.after(0, lambda: self.metric_label.configure(text=f'NFIQ2 SCORE: {nfiq2_score[-2:]}'))
+                self.after(0, lambda: self.metric_label.configure(text=f'NFIQ2 SCORE: {nfiq2_score[-2:]}'))
             else:
                 nfiq2_score = 'na'
-                self.root.after(0,lambda: self.metric_label.configure(text='NFIQ2 SCORE: ERROR'))
+                self.after(0,lambda: self.metric_label.configure(text='NFIQ2 SCORE: ERROR'))
         else:
             nfiq2_score = 'na'
-            self.root.after(0,lambda: self.metric_label.configure(text='NFIQ2 SCORE: NOT FOUND'))
+            self.after(0,lambda: self.metric_label.configure(text='NFIQ2 SCORE: NOT FOUND'))
         
 
         # Save processed image
@@ -291,7 +343,8 @@ class MyGUI():
             csvfile.write(f'\n{datetime.datetime.now()},{name},{id},{finger},{nfiq2_score[-2:].strip()}')
         
         self.duplicate = False
-        self.root.after(0,self.capture_button.configure(command=lambda: threading.Thread(target=self.take_photo).start()))
+        self.after(0,self.capture_button.configure(command=lambda: threading.Thread(target=self.take_photo).start()))
+        print(f"Take photo Time: {time.process_time() - t}")
 
     # Gets the next free ID
     def next_free(self):
@@ -480,17 +533,18 @@ class MyGUI():
         pass
 
     def on_closing(self):
+        self.preview_running = False
 
-        # Release Camera
         if hasattr(self, 'cap'):
             self.cap.release()
 
-        # Release worker thread
         self.worker_running = False
         self.worker_thread.join()
 
-        # Close window    
-        self.root.destroy()
+        if hasattr(self, 'preview_thread'):
+            self.preview_thread.join()
+
+        self.destroy()
         sys.exit()
 
 
@@ -498,7 +552,7 @@ if __name__ == '__main__':
     os.makedirs(DATA_FILEPATH, exist_ok=True)
 
     gui = MyGUI()
-
+    gui.mainloop()
     
     
     
