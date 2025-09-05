@@ -23,13 +23,18 @@ VIDEO_RES = (640, 480)
 PICTURE_RES = (4645, 3496)
 FPS = 10
 
-'''
-dependencies: rembg[cpu] numpy opencv-python pillow
-'''
+#Function for Pyinstaller quirk
+def resource_path(relative_path):
+        try:
+            base_path = sys._MEIPASS
+        except Exception:
+            base_path = os.path.abspath(".")
+        return os.path.join(base_path, relative_path)
 
 def find_arducam_index() -> int | None:
     from cv2_enumerate_cameras import enumerate_cameras
     for camera_info in enumerate_cameras():
+        print(camera_info)
         if camera_info.name == "Arducam_16MP":
             return(int(str(camera_info.index)[-1]))
     return None
@@ -39,6 +44,11 @@ class MyGUI(tki.Tk):
     def __init__(self):
         # Create main window
         super().__init__()
+
+        ico = Image.open(resource_path("assets/icon.png"))
+        photo = ImageTk.PhotoImage(ico)
+        self.wm_iconphoto(False, photo)
+
         self.preview_running = True # Determines if preview is playing or not
         self.duplicate = False
         self.latest_frame = None
@@ -58,13 +68,10 @@ class MyGUI(tki.Tk):
         self.worker_thread = threading.Thread(target=self.worker, daemon=True)
         self.worker_thread.start()
 
-        # Creates a list of Camera names
-        # self.graph = FilterGraph()
-        # self.cameras = self.graph.get_input_devices()
-        
         # Open Camera (Second argument describes backend)
         camera_index = find_arducam_index()
-        messagebox.showerror("Error", "Fingerprint Scanner NOT detected.") if not camera_index else None
+        if camera_index == None:
+            messagebox.showerror("Error", "Fingerprint Scanner NOT detected.")
         
         self.cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW) # cv2.CAP_V4L2 for linux, cv2.CAP_DSHOW for windows testing
         if not self.cap.isOpened():
@@ -203,7 +210,7 @@ class MyGUI(tki.Tk):
             self.camera_label.photo_image = photo_image
             self.camera_label.configure(image=photo_image)
 
-        self.after(50, self.update_gui_preview)
+        self.after(100, self.update_gui_preview)
     # def open_camera(self):
     #     """This Function grabs the latest frame from the camera and downscales it to 640x480px to be displayed
     #     on the TKinter GUI.

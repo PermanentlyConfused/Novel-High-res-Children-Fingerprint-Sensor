@@ -5,7 +5,7 @@ a = Analysis(
     ['Fingerprint_application_win.pyw'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('assets\\icon.png', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -32,6 +32,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=['assets\\icon.png'],
 )
 coll = COLLECT(
     exe,
