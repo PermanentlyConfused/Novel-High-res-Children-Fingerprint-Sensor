@@ -23,7 +23,7 @@ VIDEO_RES = (640, 480)
 PICTURE_RES = (4645, 3496)
 FPS = 10
 
-#Function for Pyinstaller quirk
+#Function for Pyinstaller's MEIPASS location quirk
 def resource_path(relative_path):
         try:
             base_path = sys._MEIPASS
@@ -34,7 +34,6 @@ def resource_path(relative_path):
 def find_arducam_index() -> int | None:
     from cv2_enumerate_cameras import enumerate_cameras
     for camera_info in enumerate_cameras():
-        print(camera_info)
         if camera_info.name == "Arducam_16MP":
             return(int(str(camera_info.index)[-1]))
     return None
@@ -53,7 +52,6 @@ class MyGUI(tki.Tk):
         self.duplicate = False
         self.latest_frame = None
         
-
         # Set window size and title
         self.geometry('1350x770') 
         self.title(string='Fingerprint Capture')
@@ -249,12 +247,8 @@ class MyGUI(tki.Tk):
 
         self.capture_button.configure(command=self.do_nothing)
 
-
         # Pause Preview
-        
         self.preview_running = False
-        
-
         self.cap.set(cv2.CAP_PROP_AUTOFOCUS,0)
         self.cap.set(cv2.CAP_PROP_FOCUS,1023)
         
@@ -264,9 +258,6 @@ class MyGUI(tki.Tk):
         if frame is None:
             messagebox.showerror("Error", "Could not capture frame from camera.")
             return
-        
-      
-
         
         self.capture_button.configure(text='Processing...')
         
@@ -326,7 +317,8 @@ class MyGUI(tki.Tk):
                 self.after(0,lambda: self.metric_label.configure(text='NFIQ2 SCORE: ERROR'))
         else:
             nfiq2_score = 'na'
-            self.after(0,lambda: self.metric_label.configure(text='NFIQ2 SCORE: NOT FOUND'))
+            messagebox.showerror("Error", "NFIQ2 Not Installe/Not Found")
+            self.after(0,lambda: self.metric_label.configure(text='NFIQ2 Not Installed/Not Found'))
         
 
         # Save processed image
