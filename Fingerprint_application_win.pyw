@@ -52,10 +52,12 @@ class MyGUI(tki.Tk):
         self.duplicate = False
         self.latest_frame = None
         
-        # Set window size and title
-        self.geometry('1350x770') 
+        self.state('zoomed')
         self.title(string='Fingerprint Capture')
-
+        
+        self.WINDOWDIMENSIONS=[int(self.winfo_width()*0.3333),int(self.winfo_height()*0.4444)]
+        
+        
         # Fonts
         self.button_font = font.Font(family='Helvetica', size=35, weight='bold')
         self.top_button_font = font.Font(family='Helvetica', size=8)
@@ -146,7 +148,7 @@ class MyGUI(tki.Tk):
 
         self.camera_frame = tki.Frame(self.middle_frame)
         self.camera_frame.pack(side='left',padx=20)
-        self.camera_label = tki.Label(self.camera_frame,text='Camera feed',width=640,height=480)
+        self.camera_label = tki.Label(self.camera_frame,text='Camera feed',width=self.WINDOWDIMENSIONS[0],height=self.WINDOWDIMENSIONS[1])
         self.camera_label.pack()
         
         self.image_frame = tki.Frame(self.middle_frame)
@@ -169,6 +171,7 @@ class MyGUI(tki.Tk):
         self.metric_label.grid(row=0,column=1,padx=40,pady=20)
 
         # Open Camera and turn on LEDs
+        self.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.frame_lock = threading.Lock()
         self.preview_thread = threading.Thread(target=self.camera_preview_loop, daemon=True)
         self.preview_thread.start()
@@ -178,15 +181,19 @@ class MyGUI(tki.Tk):
     def camera_preview_loop(self):
         """This function will be called to read from the camera's stream by a separate thread
         """
-        while self.preview_running and self.cap.isOpened():
-            ret, frame = self.cap.read()
-            if not ret:
-                continue    
+        self.CamWidth = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+        self.CamHeight = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        while self.cap.isOpened():
+            if self.preview_running:
+                ret, frame = self.cap.read()
+                if not ret:
+                    continue    
 
-            with self.frame_lock:
-                self.latest_frame = frame.copy()    
+                with self.frame_lock:
+                    self.latest_frame = frame.copy()[round(self.CamHeight * (25/152)) : round(self.CamHeight * (1845/3496)) , 
+                          round(self.CamWidth * (1465/4645)) : round(self.CamWidth * (3065/4656))]     
 
-            time.sleep(1 / FPS)
+                # time.sleep(1 / FPS)
         
     def update_gui_preview(self):
         """This function is called every 100ms by a separate thread to update image on the main GUI
@@ -202,47 +209,14 @@ class MyGUI(tki.Tk):
         if frame is not None:
             opencv_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             image = Image.fromarray(opencv_image)
-            image.thumbnail(VIDEO_RES, Image.Resampling.LANCZOS)
+            image.thumbnail(self.WINDOWDIMENSIONS, Image.Resampling.LANCZOS)
             photo_image = ImageTk.PhotoImage(image=image)
 
             self.camera_label.photo_image = photo_image
             self.camera_label.configure(image=photo_image)
 
         self.after(100, self.update_gui_preview)
-    # def open_camera(self):
-    #     """This Function grabs the latest frame from the camera and downscales it to 640x480px to be displayed
-    #     on the TKinter GUI.
-    #     """
-    #     t = time.process_time()
-    #     if not self.preview_running:
-    #         return
-        
-    #     if self.cap.get(cv2.CAP_PROP_FOCUS) != 1023:
-    #         self.cap.set(cv2.CAP_PROP_FOCUS, 1023)
-
-    #     # Read frame
-    #     _, frame = self.cap.read()
-
-    #     # Process frame to be shown
-    #     opencv_image = cv2.cvtColor(frame,cv2.COLOR_BGR2RGB)
-    #     captured_image = Image.fromarray(opencv_image)
-    #     photo_image = ImageTk.PhotoImage(image=captured_image)
-
-    #     small_image = captured_image.copy()
-
-    #     small_image.thumbnail(VIDEO_RES, Image.Resampling.LANCZOS)
-    #     photo_image = ImageTk.PhotoImage(small_image)
-    #     # cv2.imshow("balls", np.array(small_image))
-    #     # cv2.waitKey(0)
-
-    #     # Put it on the label
-    #     self.camera_label.photo_image = photo_image
-    #     self.camera_label.configure(image=photo_image)
-
-    #     # Repeat after 10 ms
-    #     self.camera_label.after(500, self.open_camera)
-    #     print(f"Open Camera Time: {time.process_time() - t}")
-
+   
     def take_photo(self):
 
         self.capture_button.configure(command=self.do_nothing)
@@ -257,12 +231,10 @@ class MyGUI(tki.Tk):
 
         if frame is None:
             messagebox.showerror("Error", "Could not capture frame from camera.")
+            self.preview_running = True
             return
-        
-        self.capture_button.configure(text='Processing...')
-        
-        # Turn preview back on
         self.preview_running = True
+        self.capture_button.configure(text='Processing...')
 
         name = self.name_entry.get()
         id = str(self.id_entry.get())
@@ -285,10 +257,9 @@ class MyGUI(tki.Tk):
         # Preprocess
         frame = self.process(frame)
         
-
         # Show Image on Screen
         image = Image.fromarray(frame)
-        image = image.resize((640,480))
+        image = image.resize((self.WINDOWDIMENSIONS[0],self.WINDOWDIMENSIONS[1]))
         imagetk = ImageTk.PhotoImage(image=image)
         self.image_label.configure(image=imagetk)
         self.image_label.photo_image = imagetk
@@ -375,7 +346,6 @@ class MyGUI(tki.Tk):
     def process(self, inputIMG):
 
         # Resizing if applicable
-        total_s = time.perf_counter()
         id = str(self.id_entry.get())
         finger = self.finger_cb.get()
 
@@ -385,34 +355,21 @@ class MyGUI(tki.Tk):
         else:
             cv2.imwrite(os.path.join(DATA_FILEPATH,id,'Raw',id+'_'+finger+'_Raw'+'_'+self.duplicate_number+FILE_EXTENSION),inputIMG)
 
-        width = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
-        height = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-
         # Crops to fingerprint area
-        target = inputIMG[round(height * (25/152)) : round(height * (1845/3496)) , 
-                          round(width * (1465/4645)) : round(width * (3065/4656))] # 1465:3065,575:1845
+        # target = inputIMG[round(height * (25/152)) : round(height * (1845/3496)) , 
+        #                   round(width * (1465/4645)) : round(width * (3065/4656))] # 1465:3065,575:1845
         
         # Remove Background
-        rembg_s = time.perf_counter()
         try:
-            bg_removed = remove(target, session=self.rembg_session)
+            bg_removed = remove(inputIMG, session=self.rembg_session)
         except Exception as e:
             messagebox.showinfo("Remove Background Failed", f"Remove Background Failed: {e}")
-            bg_removed = target
-        rembg_e = time.perf_counter()
-        print(f'rembg: {rembg_e - rembg_s}')
-        
-        # Grayscale image
-        gray_s =  time.perf_counter()
-        grayscaled = cv2.cvtColor(bg_removed,cv2.COLOR_RGB2GRAY)
-        gray_e = time.perf_counter()
-        print(f'grayscale: {gray_e - gray_s}')
+            bg_removed = inputIMG
 
+        # Grayscale image
+        grayscaled = cv2.cvtColor(bg_removed,cv2.COLOR_RGB2GRAY)
         # Gaussian Blur to remove noise
-        blur_s = time.perf_counter()
         grayscaled = cv2.GaussianBlur(grayscaled,(3,3),1)
-        blur_e = time.perf_counter()
-        print(f'Blur: {blur_e - blur_s}')
         
         # Erosion followed by dilation to further remove noise
         # op_s = time.perf_counter()
@@ -422,27 +379,14 @@ class MyGUI(tki.Tk):
         # print(f'Opening: {op_e - op_s}')
         
         # Contrast Limited Adaptive Histogram Equalization - sharpens image
-        clahe_s = time.perf_counter()
         clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(15,15))
         cl1 = clahe.apply(grayscaled)
-        clahe_e = time.perf_counter()
-        print(f'Clahe: {clahe_e - clahe_s}')
-        
         # Threshold to remove grey pixels in-between ridges
-        thresh_s = time.perf_counter()
         _, threshold = cv2.threshold(cl1, thresh=100, maxval=255, type=cv2.THRESH_TOZERO) # 100
-        thresh_e = time.perf_counter()
-        print(f'Threshold: {thresh_e - thresh_s}')
-
         #Invert Colors
-        invert_s = time.perf_counter()
-        inverted = cv2.bitwise_not(threshold)
-        invert_e = time.perf_counter()
-        print(f'Invert: {invert_e - invert_s}')
-    
+        inverted = cv2.bitwise_not(threshold)  
     
         #Save image for NFIQ2 score
-        nfiq_s = time.perf_counter()
         resized = cv2.resize(inverted, (640, 640))
         
 
@@ -468,11 +412,6 @@ class MyGUI(tki.Tk):
             img.save(os.path.join(DATA_FILEPATH,id,'Real',id+'_'+finger+FILE_EXTENSION), dpi=(500, 500))
         else:
             img.save(os.path.join(DATA_FILEPATH,id,'Real',id+'_'+finger+'_'+self.duplicate_number+FILE_EXTENSION), dpi=(500, 500))
-        nfiq_e = time.perf_counter()
-        print(f'nfiq: {nfiq_e - nfiq_s}')
-        
-        total_e = time.perf_counter()
-        print(f'Total Time: {total_e - total_s}')
         return inverted
     
     # def set_camera(self):
@@ -525,13 +464,14 @@ class MyGUI(tki.Tk):
             u2net_path = os.path.join(os.getcwd(), ".u2net")
 
         os.environ["U2NET_HOME"] = u2net_path
-
         self.rembg_session = new_session("u2netp")
 
     def do_nothing(self):
         pass
 
     def on_closing(self):
+        """Function to release camera, join all threads, and destroy window on exit cleanly
+        """
         self.preview_running = False
 
         if hasattr(self, 'cap'):
