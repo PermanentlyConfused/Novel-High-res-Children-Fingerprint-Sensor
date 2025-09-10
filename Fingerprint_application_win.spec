@@ -4,8 +4,8 @@
 a = Analysis(
     ['Fingerprint_application_win.pyw'],
     pathex=[],
-    binaries=[],
-    datas=[('assets\\icon.png', '.')],
+    binaries=[('C:\\Program Files\\NFIQ 2\\bin\\nfiq2.exe','.')],
+    datas=[('assets\\icon.png', '.'),('assets\\splash.png', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
@@ -21,7 +21,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='Fingerprint_application_win',
+    name='Clarkson AVHBAC Fingerprint Sensor',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -33,6 +33,7 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=['assets\\icon.png'],
+    version='version.txt'
 )
 coll = COLLECT(
     exe,

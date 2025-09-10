@@ -1,7 +1,7 @@
 
 import tkinter as tki
-from tkinter import font
-from tkinter import ttk
+from tkinter import font,ttk    
+import tkinter.font as tkFont
 from tkinter import messagebox
 import cv2
 from PIL import Image, ImageTk
@@ -19,7 +19,6 @@ DATA_FILEPATH = os.path.join(os.environ["USERPROFILE"], "Documents", "Fingerprin
 LOG_FILEPATH = os.path.join(os.environ["USERPROFILE"], "Documents", "FingerprintCapture", "fingerprint_log.csv") # date,name,id,finger '
 FILE_EXTENSION = '.png'
 
-VIDEO_RES = (640, 480)
 PICTURE_RES = (4645, 3496)
 FPS = 10
 
@@ -28,7 +27,7 @@ def resource_path(relative_path):
         try:
             base_path = sys._MEIPASS
         except Exception:
-            base_path = os.path.abspath(".")
+            base_path = os.path.abspath("./assets")
         return os.path.join(base_path, relative_path)
 
 def find_arducam_index() -> int | None:
@@ -38,44 +37,61 @@ def find_arducam_index() -> int | None:
             return(int(str(camera_info.index)[-1]))
     return None
         
+class Splash(tki.Toplevel):
+    def __init__(self, parent, x, y):
+        super().__init__(parent)  
+        self.title("Loading...")  
+        self.geometry(f"351x512+{x//2-187}+{y//2-375}") 
+        self.overrideredirect(True)
+        self.configure(bg='')
+        
+        ico = Image.open(resource_path("splash.png"))
+        photo = ImageTk.PhotoImage(ico)
+        
+        splash_label = tki.Label(self, image=photo) 
+        splash_label.pack()
+        
+
+        self.update()
         
 class MyGUI(tki.Tk):
+    
     def __init__(self):
-        # Create main window
         super().__init__()
-
-        ico = Image.open(resource_path("assets/icon.png"))
+        splash = Splash(self,self.winfo_screenwidth(),self.winfo_screenheight())
+        print(self.winfo_screenwidth(),self.winfo_screenheight())
+        self.withdraw()
+        
+        ico = Image.open(resource_path("icon.png"))
         photo = ImageTk.PhotoImage(ico)
         self.wm_iconphoto(False, photo)
 
         self.preview_running = True # Determines if preview is playing or not
         self.duplicate = False
         self.latest_frame = None
-        
-        self.state('zoomed')
-        self.title(string='Fingerprint Capture')
-        
-        self.WINDOWDIMENSIONS=[int(self.winfo_width()*0.3333),int(self.winfo_height()*0.4444)]
-        
+
+        # self.state('zoomed')
+        self.title(string='Clarkson AVHBAC Fingerprint Capture')
         
         # Fonts
-        self.button_font = font.Font(family='Helvetica', size=35, weight='bold')
-        self.top_button_font = font.Font(family='Helvetica', size=8)
+        self.button_font = font.Font(family='Rosewood Std Regular', size=35, weight='bold')
+        self.top_button_font = font.Font(family='Rosewood Std Regular', size=14)
 
         # Create a thread for capturing images and changing camera
+        self.WINDOWDIMENSIONS=[int(self.winfo_screenwidth()*0.3333),int(self.winfo_screenheight()*0.4444)]
         self.worker_running = True
         self.task_queue = queue.Queue()
         self.worker_thread = threading.Thread(target=self.worker, daemon=True)
         self.worker_thread.start()
 
-        # Open Camera (Second argument describes backend)
+        # Open Camera
         camera_index = find_arducam_index()
         if camera_index == None:
-            messagebox.showerror("Error", "Fingerprint Scanner NOT detected.")
+            messagebox.showerror("‼ Error ‼", "Fingerprint Scanner NOT detected.")
         
         self.cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW) # cv2.CAP_V4L2 for linux, cv2.CAP_DSHOW for windows testing
         if not self.cap.isOpened():
-            messagebox.showerror("Error",'Could not open Camera.')
+            messagebox.showerror("⚠ Warning ⚠",'Could not open Camera.')
         else:
             self.current_camera = 0
 
@@ -86,44 +102,49 @@ class MyGUI(tki.Tk):
         self.cap.set(cv2.CAP_PROP_FPS, FPS)
         self.cap.set(cv2.CAP_PROP_AUTOFOCUS,0)
         self.cap.set(cv2.CAP_PROP_FOCUS,1023)
-
         # Start rembg session
         self.initialize_rembg()
 
-        ## Top Frame ##
-        self.top_frame = tki.Frame(self)
-        self.top_frame.pack(side='top',anchor='w', padx=20,pady=10)
+        #********************************** Header Frame **********************************
+        self.header_frame = tki.Frame(self)
         
-        self.name_label = tki.Label(self.top_frame, text="Name")
-        self.name_entry = tki.Entry(self.top_frame, width=20)
+        header_font = tkFont.Font(family="Rosewood Std Regular", size=30, weight="bold")
+        self.header_label = tki.Label(self.header_frame, text="AVHBAC Fingerprint Scanner", font=header_font)
+        
+        #********************************** Top Frame **********************************
+        normal_font =  tkFont.Font(family="Rosewood Std Regular", size=14)
+        self.top_frame = tki.Frame(self)
+        
+        self.name_label = tki.Label(self.top_frame, text="Name", font=normal_font)
+        self.name_entry = tki.Entry(self.top_frame, width=20, font=normal_font)
 
-        self.name_label.grid(row=0,column=0,sticky='w')
-        self.name_entry.grid(row=0,column=1)
+        self.name_label.grid(row=1,column=0,sticky='w')
+        self.name_entry.grid(row=1,column=1)
 
-        self.id_label = tki.Label(self.top_frame, text='ID')
-        self.id_entry = tki.Entry(self.top_frame, width=20)
+        self.id_label = tki.Label(self.top_frame, text='ID', font=normal_font)
+        self.id_entry = tki.Entry(self.top_frame, width=20,font=normal_font)
         self.next_id = tki.Button(self.top_frame,
                                   text='Next Free',
                                   font=self.top_button_font,
                                   command=self.next_free
                                   )
 
-        self.id_label.grid(row=1,column=0,sticky='w')
-        self.id_entry.grid(row=1,column=1)
-        self.next_id.grid(row=1,column=2)
+        self.id_label.grid(row=2,column=0,sticky='w')
+        self.id_entry.grid(row=2,column=1)
+        self.next_id.grid(row=2,column=2)
 
         self.finger_options = ['','R_Thumb','R_Index','R_Middle','R_Ring','R_Little','L_Thumb','L_Index','L_Middle','L_Ring','L_Little']
-        self.finger_label = tki.Label(self.top_frame, text="Finger")
-        self.finger_cb = ttk.Combobox(self.top_frame, values=self.finger_options)
+        self.finger_label = tki.Label(self.top_frame, text="Finger", font=normal_font)
+        self.finger_cb = ttk.Combobox(self.top_frame, values=self.finger_options,font=normal_font)
         self.finger_next = tki.Button(self.top_frame,
                                       text='Next Finger',
                                       font=self.top_button_font,
                                       command=self.next_finger
                                       )
         
-        self.finger_label.grid(row=2,column=0,sticky='w')
-        self.finger_cb.grid(row=2,column=1)
-        self.finger_next.grid(row=2,column=2)
+        self.finger_label.grid(row=3,column=0,sticky='w')
+        self.finger_cb.grid(row=3,column=1)
+        self.finger_next.grid(row=3,column=2,padx=10)
 
         # self.camera_options_label = tki.Label(self.top_frame,text="Set Camera")
         # self.camera_options_cb = ttk.Combobox(self.top_frame, values=self.cameras)
@@ -138,25 +159,29 @@ class MyGUI(tki.Tk):
         # self.connect_button.grid(row=3,column=2)
 
         self.duplicate_var = tki.BooleanVar()
-        self.duplicate_checkbox = tki.Checkbutton(self.top_frame, text="Allow duplicate finger pictures",variable=self.duplicate_var,onvalue=1,offvalue=0)
+        self.duplicate_checkbox = tki.Checkbutton(self.top_frame, text="Allow duplicate finger pictures",variable=self.duplicate_var,onvalue=1,offvalue=0,font=normal_font)
         self.duplicate_checkbox.grid(row=4,column=0)
 
 
-        ## Middle Frame ##
+        #********************************** Middle Frame **********************************
         self.middle_frame = tki.Frame(self)
-        self.middle_frame.pack(side='top', pady=10)
 
         self.camera_frame = tki.Frame(self.middle_frame)
-        self.camera_frame.pack(side='left',padx=20)
-        self.camera_label = tki.Label(self.camera_frame,text='Camera feed',width=self.WINDOWDIMENSIONS[0],height=self.WINDOWDIMENSIONS[1])
-        self.camera_label.pack()
+        self.camera_label = tki.Label(self.camera_frame,text='Camera Feed',width=self.WINDOWDIMENSIONS[0],height=self.WINDOWDIMENSIONS[1])
         
         self.image_frame = tki.Frame(self.middle_frame)
-        self.image_frame.pack(side='left',padx=20)
         self.image_label = tki.Label(self.image_frame)
+        
+        self.header_frame.pack(side='top', pady=(20, 10), fill='x')
+        self.header_label.pack(anchor='center') 
+        self.top_frame.pack(side='top',anchor='w', padx=20,pady=20)
+        self.middle_frame.pack(side='top', pady=10)
+        self.camera_frame.pack(side='left',padx=20)
+        self.camera_label.pack()
+        self.image_frame.pack(side='left',padx=20)
         self.image_label.pack()
-
-        ## Bottom Frame ##
+        
+        #********************************** Bottom Frame **********************************
         self.bottom_frame = tki.Frame(self)
         self.bottom_frame.pack(side='top',pady=10)
 
@@ -177,6 +202,9 @@ class MyGUI(tki.Tk):
         self.preview_thread.start()
         self.update_gui_preview() 
         # self.open_camera()
+        splash.destroy()
+        self.state('zoomed')
+        self.deiconify()
         
     def camera_preview_loop(self):
         """This function will be called to read from the camera's stream by a separate thread
@@ -193,7 +221,7 @@ class MyGUI(tki.Tk):
                     self.latest_frame = frame.copy()[round(self.CamHeight * (25/152)) : round(self.CamHeight * (1845/3496)) , 
                           round(self.CamWidth * (1465/4645)) : round(self.CamWidth * (3065/4656))]     
 
-                # time.sleep(1 / FPS)
+                time.sleep(1 / FPS)
         
     def update_gui_preview(self):
         """This function is called every 100ms by a separate thread to update image on the main GUI
@@ -256,7 +284,6 @@ class MyGUI(tki.Tk):
 
         # Preprocess
         frame = self.process(frame)
-        
         # Show Image on Screen
         image = Image.fromarray(frame)
         image = image.resize((self.WINDOWDIMENSIONS[0],self.WINDOWDIMENSIONS[1]))
@@ -288,10 +315,9 @@ class MyGUI(tki.Tk):
                 self.after(0,lambda: self.metric_label.configure(text='NFIQ2 SCORE: ERROR'))
         else:
             nfiq2_score = 'na'
-            messagebox.showerror("Error", "NFIQ2 Not Installe/Not Found")
+            messagebox.showerror("Error", "NFIQ2 Not Installed/Not Found")
             self.after(0,lambda: self.metric_label.configure(text='NFIQ2 Not Installed/Not Found'))
         
-
         # Save processed image
         if not self.duplicate:
             cv2.imwrite(os.path.join(DATA_FILEPATH,id,'Real',id+'_'+finger+FILE_EXTENSION),frame)
@@ -314,8 +340,6 @@ class MyGUI(tki.Tk):
         self.duplicate = False
         self.after(0,self.capture_button.configure(command=lambda: threading.Thread(target=self.take_photo).start()))
     
-    
-
     # Gets the next free ID
     def next_free(self):
         id = 0
@@ -344,11 +368,9 @@ class MyGUI(tki.Tk):
         self.finger_cb.insert(0,new_finger)
     
     def process(self, inputIMG):
-
         # Resizing if applicable
         id = str(self.id_entry.get())
         finger = self.finger_cb.get()
-
         ## SAVES RAW IMAGE ##
         if not self.duplicate:
             cv2.imwrite(os.path.join(DATA_FILEPATH,id,'Raw',id+'_'+finger+'_Raw'+FILE_EXTENSION),inputIMG)
@@ -449,6 +471,7 @@ class MyGUI(tki.Tk):
                 continue
             if task == 'take_photo':
                 self.take_photo()
+            
             # elif task == 'set_camera':
             #     self.set_camera()
             self.task_queue.task_done()
@@ -487,12 +510,15 @@ class MyGUI(tki.Tk):
         sys.exit()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     os.makedirs(DATA_FILEPATH, exist_ok=True)
-
     gui = MyGUI()
     gui.mainloop()
     
     
+
+    
+    
     
 
+    
