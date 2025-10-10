@@ -84,24 +84,7 @@ class MyGUI(tki.Tk):
         self.worker_thread = threading.Thread(target=self.worker, daemon=True)
         self.worker_thread.start()
 
-        # Open Camera
-        camera_index = find_arducam_index()
-        if camera_index == None:
-            messagebox.showerror("‼ Error ‼", "Fingerprint Scanner NOT detected.")
-        
-        self.cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW) # cv2.CAP_V4L2 for linux, cv2.CAP_DSHOW for windows testing
-        if not self.cap.isOpened():
-            messagebox.showerror("⚠ Warning ⚠",'Could not open Camera.')
-        else:
-            self.current_camera = 0
 
-        # Set Camera settings
-        self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, PICTURE_RES[0]) 
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PICTURE_RES[1]) 
-        self.cap.set(cv2.CAP_PROP_FPS, FPS)
-        self.cap.set(cv2.CAP_PROP_AUTOFOCUS,0)
-        self.cap.set(cv2.CAP_PROP_FOCUS,1023)
         # Start rembg session
         self.initialize_rembg()
 
@@ -203,8 +186,26 @@ class MyGUI(tki.Tk):
         self.update_gui_preview() 
         # self.open_camera()
         splash.destroy()
-        self.state('zoomed')
         self.deiconify()
+        # Open Camera
+        camera_index = find_arducam_index()
+        if camera_index == None:
+            messagebox.showerror("‼ Error ‼", "Fingerprint Scanner NOT detected.")
+        
+        self.cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW) # cv2.CAP_V4L2 for linux, cv2.CAP_DSHOW for windows testing
+        if not self.cap.isOpened():
+            messagebox.showerror("⚠ Warning ⚠",'Could not open Camera.')
+        else:
+            self.current_camera = 0
+
+        # Set Camera settings
+        self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, PICTURE_RES[0]) 
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PICTURE_RES[1]) 
+        self.cap.set(cv2.CAP_PROP_FPS, FPS)
+        self.cap.set(cv2.CAP_PROP_AUTOFOCUS,0)
+        self.cap.set(cv2.CAP_PROP_FOCUS,1023)
+        self.state('zoomed')
         
     def camera_preview_loop(self):
         """This function will be called to read from the camera's stream by a separate thread
