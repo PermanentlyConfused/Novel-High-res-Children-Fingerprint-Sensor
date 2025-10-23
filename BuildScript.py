@@ -4,7 +4,7 @@ import PyInstaller.__main__
 
 # locating spec file
 workdir = os.getcwd()
-fn_msi_spec = os.path.join(workdir, 'Fingerprint_application_win.spec')
+fn_msi_spec = os.path.join(workdir, 'PyQTFingerprint.spec')
 
 # define the "dev\dist" and "dev\build" dirs
 devdir = os.getcwd()

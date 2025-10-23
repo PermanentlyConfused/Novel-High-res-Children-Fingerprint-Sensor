@@ -33,7 +33,7 @@ def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
     except Exception:
-        base_path = os.path.abspath("./assets")
+        base_path = os.path.abspath(".")
     return os.path.join(base_path, relative_path)
 
 def find_arducam_index() -> int | None:
@@ -41,8 +41,9 @@ def find_arducam_index() -> int | None:
         from cv2_enumerate_cameras import enumerate_cameras
     except Exception:
         return None
-    for camera_info in enumerate_cameras():
+    for camera_info in enumerate_cameras(cv2.CAP_DSHOW):
         if camera_info.name == "Arducam_16MP":
+            # print(int(str(camera_info.index)[-1])) #TODO Looks
             return int(str(camera_info.index)[-1])
     return None
 
@@ -52,6 +53,7 @@ class CameraThread(QtCore.QThread):
     def __init__(self, camera_index, parent=None):
         super().__init__(parent)
         self.camera_index = camera_index
+        # print(camera_index)
         self._running = True
         self._preview_running = True
         self.cap = None
@@ -99,7 +101,7 @@ class CameraThread(QtCore.QThread):
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowIcon(QtGui.QIcon(resource_path("icon.png")))
+        self.setWindowIcon(QtGui.QIcon(resource_path("./assets/icon.png")))
         self.setWindowTitle("Clarkson AVHBAC Fingerprint Capture")
         self.resize(1200, 800)
 
@@ -120,10 +122,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Camera
         camera_index = find_arducam_index()
+
         if camera_index is None:
-            # QtWidgets.QMessageBox.critical(self, "‼ Error ‼", "Fingerprint Scanner NOT detected.")
-            # camera_index = 0  # fall back to default
-            None #! Will test with the camera later
+            QtWidgets.QMessageBox.critical(self, "‼ Error ‼", "Fingerprint Scanner NOT detected.")
+            camera_index = 0  # fall back to default
+            # None #! Will test with the camera later
 
         self.camera_thread = CameraThread(camera_index)
         self.camera_thread.frame_ready.connect(self._on_frame)
@@ -132,7 +135,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Start a QTimer to update preview widget (throttled)
         self.preview_timer = QtCore.QTimer()
         self.preview_timer.timeout.connect(self.update_preview_label)
-        self.preview_timer.start(100)
+        self.preview_timer.start(50)
 
     #* ---------------- UI ----------------
     def _build_ui(self):
@@ -190,21 +193,20 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # camera preview label
         self.camera_label = QtWidgets.QLabel()
-        self.camera_label.setFixedSize( int(self.width() * 0.33), int(self.height() * 0.44) )
+        self.camera_label.setFixedSize( int(self.width() * 0.44), int(self.height() * 0.44) )
         self.camera_label.setStyleSheet("background-color: #222;")
         self.camera_label.setAlignment(QtCore.Qt.AlignCenter)
         mid_layout.addWidget(self.camera_label)
 
         # processed image label
         self.image_label = QtWidgets.QLabel()
-        self.image_label.setFixedSize( int(self.width() * 0.33), int(self.height() * 0.44) )
+        self.image_label.setFixedSize( int(self.width() * 0.44), int(self.height() * 0.44) )
         self.image_label.setStyleSheet("background-color: #111;")
         self.image_label.setAlignment(QtCore.Qt.AlignCenter)
         mid_layout.addWidget(self.image_label)
 
         layout.addWidget(self.middle_widget)
 
-        # Bottom: Capture button + metric
         bottom = QtWidgets.QWidget()
         bottom_layout = QtWidgets.QHBoxLayout(bottom)
 
@@ -216,17 +218,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.metric_label = QtWidgets.QLabel("")
         self.metric_label.setFont(big_font)
+        self.metric_label.setAlignment(Qt.AlignCenter)
         bottom_layout.addWidget(self.metric_label)
 
         layout.addWidget(bottom)
 
     #* ---------------- RemBg ----------------
     def initialize_rembg(self):
-        #TODO: NOTE TO SELF, ADD .u2net to pyinstaller's dir
-        if hasattr(sys, "_MEIPASS"):
-            u2net_path = os.path.join(sys._MEIPASS, ".u2net")
-        else:
-            u2net_path = os.path.join(os.getcwd(), ".u2net")
+        u2net_path = resource_path('.u2net')
         os.environ["U2NET_HOME"] = u2net_path
         try:
             self.rembg_session = new_session("u2netp")
@@ -273,9 +272,9 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.capture_btn.setEnabled(True)
             self.task_queue.task_done()
 
-    #! ---------------- Take Photo / Processing ----------------
+    #* ---------------- Take Photo / Processing ----------------
     def take_photo(self):
-        self.camera_thread.pause_preview()
+        # self.camera_thread.pause_preview()
 
         #? grab latest frame
         with self.frame_lock:
@@ -286,7 +285,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.camera_thread.resume_preview()
             return
 
-        self.camera_thread.resume_preview()
+        # self.camera_thread.resume_preview()
 
 
         name = self.name_entry.text()
@@ -365,11 +364,17 @@ class MainWindow(QtWidgets.QMainWindow):
 
         #? Run NFIQ2 if available
         nfiq2_score = 'na'
-        nfiq2_path = "C:\\Program Files\\NFIQ 2\\bin\\nfiq2.exe"
+        # nfiq2_path = "C:\\Program Files\\NFIQ 2\\bin\\nfiq2.exe"
+        nfiq2_path = resource_path("./NFIQ 2/bin/nfiq2.exe")
+        # print(nfiq2_path)
         image_for_nfiq = real_path
         if os.path.exists(nfiq2_path):
             try:
-                result = subprocess.run([nfiq2_path, image_for_nfiq], input='y', capture_output=True, text=True)
+                result = subprocess.run([nfiq2_path, image_for_nfiq], 
+                                        input='y', 
+                                        capture_output=True,
+                                        text=True,
+                                        creationflags=subprocess.CREATE_NO_WINDOW )
                 if 'Error' not in result.stdout:
                     out = result.stdout.strip()
                     nfiq2_score = out[-2:]
@@ -409,20 +414,32 @@ class MainWindow(QtWidgets.QMainWindow):
 
     #! ---------------- Close / cleanup ----------------
     def closeEvent(self, ev):
-        self.camera_thread.stop()
         self.worker_running = False
-        #? join worker threads
-        try:
+
+        while not self.task_queue.empty():
+            try:
+                self.task_queue.get_nowait()
+                self.task_queue.task_done()
+            except queue.Empty:
+                break
+        if hasattr(self, "camera_thread") and self.camera_thread.isRunning():
+            self.camera_thread.stop()
+        if hasattr(self, "worker_thread") and self.worker_thread.is_alive():
             self.worker_thread.join(timeout=1.0)
-        except Exception:
-            pass
+        for t in threading.enumerate():
+            if t is not threading.current_thread():
+                try:
+                    t.join(timeout=0.5)
+                except Exception:
+                    pass
+
+        print("All threads stopped. Closing application cleanly.")
         ev.accept()
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
     os.makedirs(DATA_FILEPATH, exist_ok=True)
-    splash_pixmap = QPixmap(resource_path("splash.png"))
-    global splash
+    splash_pixmap = QPixmap(resource_path("./assets/splash.png"))    
     splash = QSplashScreen(splash_pixmap, Qt.WindowStaysOnTopHint)
     splash.show()
     splash.showMessage("Loading modules...", Qt.AlignCenter, Qt.red)

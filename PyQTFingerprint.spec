@@ -4,8 +4,8 @@
 a = Analysis(
     ['PyQTFingerprint.pyw'],
     pathex=[],
-    binaries=[('C:\\Program Files\\NFIQ 2\\bin\\nfiq2.exe','.')],
-    datas=[('assets\\icon.png', '.'),('assets\\splash.png', '.')],
+    binaries=[('C:\\Program Files\\NFIQ 2\\bin\\nfiq2.exe','.\\NFIQ 2\\bin\\.')],
+    datas=[('assets\\icon.png', '.\\assets'),('assets\\splash.png', '.\\assets'),('.u2net\\u2netp.onnx','.\\.u2net\\.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

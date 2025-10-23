@@ -30,13 +30,13 @@ VSVersionInfo(
       StringTable(
         '040904B0',
         [StringStruct('CompanyName', 'Clarkson University'),
-        StringStruct('FileDescription', 'A tool to accurately capture fingerprints of children for AVHBAC lab of Clarkson University'),
-        StringStruct('FileVersion', '0.0.3'),
+        StringStruct('FileDescription', 'Accurately capture fingerprints of children built by AVHBAC lab of Clarkson University'),
+        StringStruct('FileVersion', '0.0.4'),
         StringStruct('InternalName', 'clarkson_fingerprint_sensor'),
         StringStruct('LegalCopyright', 'MIT License'),
         StringStruct('OriginalFilename', 'Fingerprint_application_win.exe'),
         StringStruct('ProductName', 'Clarkson AVHBAC Fingerprint Sensor'),
-        StringStruct('ProductVersion', '0.0.3')])
+        StringStruct('ProductVersion', '0.0.4')])
       ]), 
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]
