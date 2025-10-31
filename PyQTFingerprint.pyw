@@ -70,7 +70,7 @@ class CameraThread(QtCore.QThread):
         self.cap.set(cv2.CAP_PROP_FPS, FPS)
         self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
         self.cap.set(cv2.CAP_PROP_FOCUS, 1023)
-
+        print( int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)),int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
         while self._running and self.cap.isOpened():
             if self._preview_running:
                 ret, frame = self.cap.read()
@@ -193,14 +193,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # camera preview label
         self.camera_label = QtWidgets.QLabel()
-        self.camera_label.setFixedSize( int(self.width() * 0.44), int(self.height() * 0.44) )
+        self.camera_label.setFixedSize( int(self.width() * 0.37), int(self.height() * 0.44) )
         self.camera_label.setStyleSheet("background-color: #222;")
         self.camera_label.setAlignment(QtCore.Qt.AlignCenter)
         mid_layout.addWidget(self.camera_label)
 
         # processed image label
         self.image_label = QtWidgets.QLabel()
-        self.image_label.setFixedSize( int(self.width() * 0.44), int(self.height() * 0.44) )
+        self.image_label.setFixedSize( int(self.width() * 0.37), int(self.height() * 0.44) )
         self.image_label.setStyleSheet("background-color: #111;")
         self.image_label.setAlignment(QtCore.Qt.AlignCenter)
         mid_layout.addWidget(self.image_label)
@@ -415,7 +415,6 @@ class MainWindow(QtWidgets.QMainWindow):
     #! ---------------- Close / cleanup ----------------
     def closeEvent(self, ev):
         self.worker_running = False
-
         while not self.task_queue.empty():
             try:
                 self.task_queue.get_nowait()
@@ -441,10 +440,9 @@ def main():
     os.makedirs(DATA_FILEPATH, exist_ok=True)
     splash_pixmap = QPixmap(resource_path("./assets/splash.png"))    
     splash = QSplashScreen(splash_pixmap, Qt.WindowStaysOnTopHint)
-    splash.show()
-    splash.showMessage("Loading modules...", Qt.AlignCenter, Qt.red)
-    time.sleep(1)
     win = MainWindow()
+    splash.show()
+    splash.showMessage("Loading modules...", Qt.AlignCenter, Qt.black)
     win.show()
     splash.finish(win)
     sys.exit(app.exec_())
