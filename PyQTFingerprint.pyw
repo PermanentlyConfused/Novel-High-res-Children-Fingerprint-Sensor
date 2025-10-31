@@ -8,7 +8,6 @@ import time
 import subprocess
 
 import cv2
-import numpy as np
 from PIL import Image
 
 from rembg import remove
@@ -67,10 +66,10 @@ class CameraThread(QtCore.QThread):
         self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, PICTURE_RES[0])
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PICTURE_RES[1])
-        self.cap.set(cv2.CAP_PROP_FPS, FPS)
+        # self.cap.set(cv2.CAP_PROP_FPS, FPS)
         self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
         self.cap.set(cv2.CAP_PROP_FOCUS, 1023)
-        print( int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)),int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+        print("DEBUG--", int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)),int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
         while self._running and self.cap.isOpened():
             if self._preview_running:
                 ret, frame = self.cap.read()
@@ -112,10 +111,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.task_queue = queue.Queue()
         self.worker_running = True
 
-        # Start rembg session
-        self.initialize_rembg()
-        
-        
         self._build_ui()
         self.worker_thread = threading.Thread(target=self._task_worker, daemon=True)
         self.worker_thread.start()
@@ -125,9 +120,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if camera_index is None:
             QtWidgets.QMessageBox.critical(self, "‼ Error ‼", "Fingerprint Scanner NOT detected.")
-            camera_index = 0  # fall back to default
+            QtWidgets.QApplication.quit()
+            raise SystemExit
             # None #! Will test with the camera later
-
+        self.initialize_rembg()
         self.camera_thread = CameraThread(camera_index)
         self.camera_thread.frame_ready.connect(self._on_frame)
         self.camera_thread.start()
@@ -142,7 +138,6 @@ class MainWindow(QtWidgets.QMainWindow):
         central = QtWidgets.QWidget()
         self.setCentralWidget(central)
         layout = QtWidgets.QVBoxLayout(central)
-
         # Header
         header = QtWidgets.QLabel("AVHBAC Fingerprint Scanner")
         header.setAlignment(QtCore.Qt.AlignCenter)
@@ -437,12 +432,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
-    os.makedirs(DATA_FILEPATH, exist_ok=True)
     splash_pixmap = QPixmap(resource_path("./assets/splash.png"))    
     splash = QSplashScreen(splash_pixmap, Qt.WindowStaysOnTopHint)
-    win = MainWindow()
-    splash.show()
     splash.showMessage("Loading modules...", Qt.AlignCenter, Qt.black)
+    splash.show()
+    os.makedirs(DATA_FILEPATH, exist_ok=True)
+    win = MainWindow()
     win.show()
     splash.finish(win)
     sys.exit(app.exec_())
