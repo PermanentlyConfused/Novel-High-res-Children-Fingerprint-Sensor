@@ -57,6 +57,12 @@ class CameraThread(QtCore.QThread):
         self._preview_running = True
         self.cap = None
 
+    # def modifyFocus(self,focusVal):
+    #     self.cap.set(cv2.CAP_PROP_FOCUS, focusVal)
+    
+    # def modifyExposure(self,exposureVal):
+    #     self.cap.set(cv2.CAP_PROP_EXPOSURE, exposureVal)
+    
     def run(self):
         # open capture
         self.cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
@@ -66,18 +72,25 @@ class CameraThread(QtCore.QThread):
         self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, PICTURE_RES[0])
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PICTURE_RES[1])
-        # self.cap.set(cv2.CAP_PROP_FPS, FPS)
+        self.cap.set(cv2.CAP_PROP_FPS, FPS)
+        self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0) # manual mode
+        self.cap.set(cv2.CAP_PROP_EXPOSURE, -4)
+        self.cap.set(cv2.CAP_PROP_AUTO_WB, 0)
+        self.cap.set(cv2.CAP_PROP_WB_TEMPERATURE,0)
+        self.cap.set(cv2.CAP_PROP_ISO_SPEED, 800) 
         self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
         self.cap.set(cv2.CAP_PROP_FOCUS, 1023)
         print("DEBUG--", int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)),int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
         while self._running and self.cap.isOpened():
             if self._preview_running:
                 ret, frame = self.cap.read()
+                frame = cv2.flip(frame, 0)
                 if ret:
                     h = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                     w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                    cropped = frame[round(h * (25/152)) : round(h * (1845/3496)),
-                                    round(w * (1465/4645)) : round(w * (3065/4656))]
+                    cropped = frame[round(h * (1200/3496)) : round(h * (3496/3496)),
+                                    round(w * (960/4645)) : round(w * (3696/4656))]
+                    # gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
                     self.frame_ready.emit(cropped)
                 time.sleep(1 / FPS)
             else:
@@ -102,7 +115,7 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__()
         self.setWindowIcon(QtGui.QIcon(resource_path("./assets/icon.png")))
         self.setWindowTitle("Clarkson AVHBAC Fingerprint Capture")
-        self.resize(1200, 800)
+        self.resize(1000, 800)
 
         self.duplicate = False
         self.duplicate_number = None
@@ -160,10 +173,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.id_entry = QtWidgets.QLineEdit()
         self.id_entry.setFont(normal_font)
         top_layout.addWidget(self.id_entry, 1, 1)
-        self.next_id_btn = QtWidgets.QPushButton("Next Free")
-        self.next_id_btn.setFont(normal_font)
-        self.next_id_btn.clicked.connect(self.next_free)
-        top_layout.addWidget(self.next_id_btn, 1, 2)
+        # self.next_id_btn = QtWidgets.QPushButton("Next Free")
+        # self.next_id_btn.setFont(normal_font)
+        # self.next_id_btn.clicked.connect(self.next_free)
+        # top_layout.addWidget(self.next_id_btn, 1, 2)
 
         top_layout.addWidget(QtWidgets.QLabel("Finger"), 2, 0)
         self.finger_options = ['', 'R_Thumb','R_Index','R_Middle','R_Ring','R_Little','L_Thumb','L_Index','L_Middle','L_Ring','L_Little']
@@ -179,6 +192,26 @@ class MainWindow(QtWidgets.QMainWindow):
         self.duplicate_cb = QtWidgets.QCheckBox("Allow duplicate finger pictures")
         self.duplicate_cb.setFont(normal_font)
         top_layout.addWidget(self.duplicate_cb, 3, 0, 1, 2)
+        
+        
+        #TODO  Set Camera Focus / Exposure for testing
+        # top_layout.addWidget(QtWidgets.QLabel("Focus 0-1024"), 4, 0)
+        # self.focus_entry = QtWidgets.QLineEdit()
+        # self.focus_entry.setFont(normal_font)
+        # top_layout.addWidget(self.focus_entry, 4, 1)
+        # self.set_focus_btn = QtWidgets.QPushButton("Set Focus")
+        # self.set_focus_btn.setFont(normal_font)
+        # self.set_focus_btn.clicked.connect(self.set_focus)
+        # top_layout.addWidget(self.set_focus_btn, 4, 2)
+        
+        # top_layout.addWidget(QtWidgets.QLabel("Set Exposure, Default -7"), 4, 0)
+        # self.focus_entry = QtWidgets.QLineEdit()
+        # self.focus_entry.setFont(normal_font)
+        # top_layout.addWidget(self.focus_entry, 4, 1)
+        # self.set_focus_btn = QtWidgets.QPushButton("Set Exposure")
+        # self.set_focus_btn.setFont(normal_font)
+        # self.set_focus_btn.clicked.connect(self.setExposure)
+        # top_layout.addWidget(self.set_focus_btn, 4, 2)
 
         layout.addWidget(top_widget)
 
@@ -188,14 +221,16 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # camera preview label
         self.camera_label = QtWidgets.QLabel()
-        self.camera_label.setFixedSize( int(self.width() * 0.37), int(self.height() * 0.44) )
+        # self.camera_label.setFixedSize( int(self.width() * 0.37), int(self.height() * 0.44) )
+        self.camera_label.setFixedSize( 500,500 )
         self.camera_label.setStyleSheet("background-color: #222;")
         self.camera_label.setAlignment(QtCore.Qt.AlignCenter)
         mid_layout.addWidget(self.camera_label)
 
         # processed image label
         self.image_label = QtWidgets.QLabel()
-        self.image_label.setFixedSize( int(self.width() * 0.37), int(self.height() * 0.44) )
+        # self.image_label.setFixedSize( int(self.width() * 0.37), int(self.height() * 0.44) )
+        self.image_label.setFixedSize( 500,500 )
         self.image_label.setStyleSheet("background-color: #111;")
         self.image_label.setAlignment(QtCore.Qt.AlignCenter)
         mid_layout.addWidget(self.image_label)
@@ -241,11 +276,11 @@ class MainWindow(QtWidgets.QMainWindow):
             if self.latest_frame is not None:
                 frame = self.latest_frame.copy()
         if frame is not None:
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            h, w, ch = rgb.shape
-            bytes_per_line = ch * w
-            qimg = QtGui.QImage(rgb.data, w, h, bytes_per_line, QtGui.QImage.Format_RGB888)
-            scaled = qimg.scaled(self.camera_label.size(), QtCore.Qt.KeepAspectRatio)
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            h, w = gray.shape
+            bytes_per_line  = w  
+            qimg = QtGui.QImage(gray.data, w, h, bytes_per_line, QtGui.QImage.Format_Grayscale8)
+            scaled = qimg.scaled(self.camera_label.size(), QtCore.Qt.IgnoreAspectRatio)
             pix = QtGui.QPixmap.fromImage(scaled)
             self.camera_label.setPixmap(pix)
 
@@ -277,11 +312,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if frame is None:
             QtWidgets.QMessageBox.critical(self, "Error", "Could not capture frame from camera.")
-            self.camera_thread.resume_preview()
+            # self.camera_thread.resume_preview()
             return
 
         # self.camera_thread.resume_preview()
-
 
         name = self.name_entry.text()
         id_str = str(self.id_entry.text()).strip() or "0"
@@ -305,6 +339,8 @@ class MainWindow(QtWidgets.QMainWindow):
             raw_path = raw_path + "_" + self.duplicate_number + FILE_EXTENSION
         else:
             raw_path = raw_path + FILE_EXTENSION
+            
+
         cv2.imwrite(raw_path, frame)
 
         try:
@@ -318,13 +354,14 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.information(self, "Remove Background Failed", f"Remove Background Failed: {e}")
             bg_removed = rgb
 
+        #! most cv2 writes are to be removed
         grayscaled = cv2.cvtColor(bg_removed, cv2.COLOR_RGB2GRAY)
         grayscaled = cv2.GaussianBlur(grayscaled, (3,3), 1)
 
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(15,15))
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
         cl1 = clahe.apply(grayscaled)
-        _, threshold = cv2.threshold(cl1, thresh=100, maxval=255, type=cv2.THRESH_TOZERO)
-        inverted = cv2.bitwise_not(threshold)
+       # _, threshold = cv2.threshold(cl1, thresh=100, maxval=255, type=cv2.THRESH_TOZERO)
+        inverted = cv2.bitwise_not(cl1)
 
         #? save resized 640x640 for NFIQ
         resized = cv2.resize(inverted, (640, 640))
@@ -351,7 +388,6 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             pass
 
-        # Show processed image in GUI (converted to QPixmap)
         qimg = QtGui.QImage(resized.data, resized.shape[1], resized.shape[0], resized.shape[1], QtGui.QImage.Format_Grayscale8)
         scaled = qimg.scaled(self.image_label.size(), QtCore.Qt.KeepAspectRatio)
         pix = QtGui.QPixmap.fromImage(scaled)
@@ -359,7 +395,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         #? Run NFIQ2 if available
         nfiq2_score = 'na'
-        # nfiq2_path = "C:\\Program Files\\NFIQ 2\\bin\\nfiq2.exe"
         nfiq2_path = resource_path("./NFIQ 2/bin/nfiq2.exe")
         # print(nfiq2_path)
         image_for_nfiq = real_path
@@ -394,18 +429,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.duplicate_cb.setChecked(False)
 
     #! ---------------- Utility functions ----------------
-    def next_free(self):
-        id_count = 0
-        if os.path.exists(DATA_FILEPATH):
-            for _, subfolders, __ in os.walk(DATA_FILEPATH):
-                if subfolders != []:
-                    id_count += len(subfolders)
-        self.id_entry.setText(str(id_count))
-
     def next_finger(self):
         cur = self.finger_cb.currentIndex()
         nxt = 0 if cur == (len(self.finger_options) - 1) else cur + 1
         self.finger_cb.setCurrentIndex(nxt)
+        
+    # def set_focus(self):
+    #     self.camera_thread.modifyFocus(int(self.focus_entry.text().strip()))
+    
+    # def setExposure(self):
+    #     self.camera_thread.modifyExposure(int(self.focus_entry.text().strip()))
 
     #! ---------------- Close / cleanup ----------------
     def closeEvent(self, ev):
@@ -431,13 +464,14 @@ class MainWindow(QtWidgets.QMainWindow):
         ev.accept()
 
 def main():
+    #TODO: Modify splash screen to let it stay until camera is fully loaded
     app = QtWidgets.QApplication(sys.argv)
+    os.makedirs(DATA_FILEPATH, exist_ok=True)
+    win = MainWindow()
     splash_pixmap = QPixmap(resource_path("./assets/splash.png"))    
     splash = QSplashScreen(splash_pixmap, Qt.WindowStaysOnTopHint)
     splash.showMessage("Loading modules...", Qt.AlignCenter, Qt.black)
     splash.show()
-    os.makedirs(DATA_FILEPATH, exist_ok=True)
-    win = MainWindow()
     win.show()
     splash.finish(win)
     sys.exit(app.exec_())
