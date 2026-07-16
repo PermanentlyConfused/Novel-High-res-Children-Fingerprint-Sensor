@@ -9,7 +9,6 @@ import subprocess
 
 import cv2
 from PIL import Image
-
 from rembg import remove
 from rembg.bg import new_session
 
@@ -18,96 +17,9 @@ from PyQt5.QtWidgets import QSplashScreen
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtCore import Qt
 
-#! ------------------ Configurations ------------------
-DATA_FILEPATH = os.path.join(os.environ["USERPROFILE"], "Documents", "FingerprintCapture", "Fingerprint_Data")
-LOG_FILEPATH = os.path.join(os.environ["USERPROFILE"], "Documents", "FingerprintCapture", "fingerprint_log.csv") 
-FILE_EXTENSION = '.png'
-
-PICTURE_RES = (4645, 3496)
-FPS = 10
-
-#! ---------------------------------------------------
-
-def resource_path(relative_path):
-    try:
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
-    return os.path.join(base_path, relative_path)
-
-def find_arducam_index() -> int | None:
-    try:
-        from cv2_enumerate_cameras import enumerate_cameras
-    except Exception:
-        return None
-    for camera_info in enumerate_cameras(cv2.CAP_DSHOW):
-        if camera_info.name == "Arducam_16MP":
-            # print(int(str(camera_info.index)[-1])) #TODO Looks
-            return int(str(camera_info.index)[-1])
-    return None
-
-#! ---------- Camera Thread ----------
-class CameraThread(QtCore.QThread):
-    frame_ready = QtCore.pyqtSignal(object) 
-    def __init__(self, camera_index, parent=None):
-        super().__init__(parent)
-        self.camera_index = camera_index
-        # print(camera_index)
-        self._running = True
-        self._preview_running = True
-        self.cap = None
-
-    # def modifyFocus(self,focusVal):
-    #     self.cap.set(cv2.CAP_PROP_FOCUS, focusVal)
-    
-    # def modifyExposure(self,exposureVal):
-    #     self.cap.set(cv2.CAP_PROP_EXPOSURE, exposureVal)
-    
-    def run(self):
-        # open capture
-        self.cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
-        if not self.cap.isOpened():
-            return
-        # set camera properties
-        self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, PICTURE_RES[0])
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, PICTURE_RES[1])
-        self.cap.set(cv2.CAP_PROP_FPS, FPS)
-        self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0) # manual mode
-        self.cap.set(cv2.CAP_PROP_EXPOSURE, -4)
-        self.cap.set(cv2.CAP_PROP_AUTO_WB, 0)
-        self.cap.set(cv2.CAP_PROP_WB_TEMPERATURE,0)
-        self.cap.set(cv2.CAP_PROP_ISO_SPEED, 800) 
-        self.cap.set(cv2.CAP_PROP_AUTOFOCUS, 0)
-        self.cap.set(cv2.CAP_PROP_FOCUS, 1023)
-        print("DEBUG--", int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)),int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-        while self._running and self.cap.isOpened():
-            if self._preview_running:
-                ret, frame = self.cap.read()
-                frame = cv2.flip(frame, 0)
-                if ret:
-                    h = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-                    w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                    cropped = frame[round(h * (1200/3496)) : round(h * (3496/3496)),
-                                    round(w * (960/4645)) : round(w * (3696/4656))]
-                    # gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
-                    self.frame_ready.emit(cropped)
-                time.sleep(1 / FPS)
-            else:
-                time.sleep(0.05)
-
-        if self.cap and self.cap.isOpened():
-            self.cap.release()
-
-    def stop(self):
-        self._running = False
-        self.wait()
-
-    def pause_preview(self):
-        self._preview_running = False
-
-    def resume_preview(self):
-        self._preview_running = True
+from helper import *
+from config import *
+from camera import CameraThread
 
 #! ---------- Main Window ----------
 class MainWindow(QtWidgets.QMainWindow):
@@ -128,7 +40,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.worker_thread = threading.Thread(target=self._task_worker, daemon=True)
         self.worker_thread.start()
 
-        # Camera
         camera_index = find_arducam_index()
 
         if camera_index is None:
@@ -136,6 +47,7 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QApplication.quit()
             raise SystemExit
             # None #! Will test with the camera later
+            
         self.initialize_rembg()
         self.camera_thread = CameraThread(camera_index)
         self.camera_thread.frame_ready.connect(self._on_frame)
@@ -144,7 +56,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Start a QTimer to update preview widget (throttled)
         self.preview_timer = QtCore.QTimer()
         self.preview_timer.timeout.connect(self.update_preview_label)
-        self.preview_timer.start(50)
+        self.preview_timer.start(40)
 
     #* ---------------- UI ----------------
     def _build_ui(self):
@@ -192,7 +104,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.duplicate_cb = QtWidgets.QCheckBox("Allow duplicate finger pictures")
         self.duplicate_cb.setFont(normal_font)
         top_layout.addWidget(self.duplicate_cb, 3, 0, 1, 2)
-        
+        self.duplicate_cb.setChecked(True)
         
         #TODO  Set Camera Focus / Exposure for testing
         # top_layout.addWidget(QtWidgets.QLabel("Focus 0-1024"), 4, 0)
@@ -222,7 +134,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # camera preview label
         self.camera_label = QtWidgets.QLabel()
         # self.camera_label.setFixedSize( int(self.width() * 0.37), int(self.height() * 0.44) )
-        self.camera_label.setFixedSize( 500,500 )
+        self.camera_label.setFixedSize(500, 450)
         self.camera_label.setStyleSheet("background-color: #222;")
         self.camera_label.setAlignment(QtCore.Qt.AlignCenter)
         mid_layout.addWidget(self.camera_label)
@@ -253,6 +165,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         layout.addWidget(bottom)
 
+
     #* ---------------- RemBg ----------------
     def initialize_rembg(self):
         u2net_path = resource_path('.u2net')
@@ -270,7 +183,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.latest_frame = frame_bgr.copy()
 
     def update_preview_label(self):
-        #? display latest_frame on camera_label
         frame = None
         with self.frame_lock:
             if self.latest_frame is not None:
@@ -278,11 +190,11 @@ class MainWindow(QtWidgets.QMainWindow):
         if frame is not None:
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             h, w = gray.shape
-            bytes_per_line  = w  
+            bytes_per_line = w
             qimg = QtGui.QImage(gray.data, w, h, bytes_per_line, QtGui.QImage.Format_Grayscale8)
-            scaled = qimg.scaled(self.camera_label.size(), QtCore.Qt.IgnoreAspectRatio)
-            pix = QtGui.QPixmap.fromImage(scaled)
-            self.camera_label.setPixmap(pix)
+            pix = QtGui.QPixmap.fromImage(qimg)
+            scaled = pix.scaled(self.camera_label.size(), QtCore.Qt.KeepAspectRatio, QtCore.Qt.SmoothTransformation)
+            self.camera_label.setPixmap(scaled)
 
     #* ---------------- Task worker ----------------
     def _task_worker(self):
@@ -342,7 +254,6 @@ class MainWindow(QtWidgets.QMainWindow):
             
 
         cv2.imwrite(raw_path, frame)
-
         try:
             #? convert BGR->RGB for rembg which expects RGB-like input
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -353,18 +264,24 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception as e:
             QtWidgets.QMessageBox.information(self, "Remove Background Failed", f"Remove Background Failed: {e}")
             bg_removed = rgb
-
         #! most cv2 writes are to be removed
         grayscaled = cv2.cvtColor(bg_removed, cv2.COLOR_RGB2GRAY)
-        grayscaled = cv2.GaussianBlur(grayscaled, (3,3), 1)
-
-        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+        cv2.imwrite(os.path.join(DATA_FILEPATH, id_str, 'Raw', f"{id_str}_{finger}_Raw") + "_" + "Grayscaled" + FILE_EXTENSION, grayscaled)
+        
+        # blurred = cv2.GaussianBlur(grayscaled, (3,3), 1)
+        # cv2.imwrite(os.path.join(DATA_FILEPATH, id_str, 'Raw', f"{id_str}_{finger}_Raw") + "_" + "Gaussian Blurred" + FILE_EXTENSION, blurred)
+        
+        clahe = cv2.createCLAHE(clipLimit=5.0, tileGridSize=(8,8))
         cl1 = clahe.apply(grayscaled)
-       # _, threshold = cv2.threshold(cl1, thresh=100, maxval=255, type=cv2.THRESH_TOZERO)
+        cv2.imwrite(os.path.join(DATA_FILEPATH, id_str, 'Raw', f"{id_str}_{finger}_Raw") + "_" + "CLAHE" + FILE_EXTENSION, cl1)
+        # _, threshold = cv2.threshold(cl1, thresh=100, maxval=255, type=cv2.THRESH_TOZERO)
+        # cv2.imwrite(os.path.join(DATA_FILEPATH, id_str, 'Raw', f"{id_str}_{finger}_Raw") + "_" + "THRESHOLD" + FILE_EXTENSION, threshold)
+        
         inverted = cv2.bitwise_not(cl1)
-
+        cv2.imwrite(os.path.join(DATA_FILEPATH, id_str, 'Raw', f"{id_str}_{finger}_Raw") + "_" + "INVERTED" + FILE_EXTENSION, inverted)
         #? save resized 640x640 for NFIQ
         resized = cv2.resize(inverted, (640, 640))
+        cv2.imwrite(os.path.join(DATA_FILEPATH, id_str, 'Raw', f"{id_str}_{finger}_Raw") + "_" + "RESIZED" + FILE_EXTENSION, resized)
 
         #? Save Real and NFIQ files
         real_fname = f"{id_str}_{finger}"
@@ -424,9 +341,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 csvfile.write('date,name,id,finger,nfiq\n')
             csvfile.write(f'{datetime.datetime.now()},{name},{id_str},{finger},{str(nfiq2_score).strip()}\n')
 
-        #? reset duplicate flag
-        self.duplicate = False
-        self.duplicate_cb.setChecked(False)
+        # #? reset duplicate flag
+        # self.duplicate = False
+        # self.duplicate_cb.setChecked(False)
 
     #! ---------------- Utility functions ----------------
     def next_finger(self):
@@ -464,15 +381,19 @@ class MainWindow(QtWidgets.QMainWindow):
         ev.accept()
 
 def main():
-    #TODO: Modify splash screen to let it stay until camera is fully loaded
     app = QtWidgets.QApplication(sys.argv)
     os.makedirs(DATA_FILEPATH, exist_ok=True)
-    win = MainWindow()
+    
     splash_pixmap = QPixmap(resource_path("./assets/splash.png"))    
     splash = QSplashScreen(splash_pixmap, Qt.WindowStaysOnTopHint)
     splash.showMessage("Loading modules...", Qt.AlignCenter, Qt.black)
     splash.show()
+    app.processEvents()
+
+    win = MainWindow()
+    time.sleep(2) #! Blocking sleep but gives time for Camera's IC to init
     win.show()
+
     splash.finish(win)
     sys.exit(app.exec_())
 
