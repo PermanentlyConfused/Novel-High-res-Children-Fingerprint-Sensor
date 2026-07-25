@@ -11,6 +11,7 @@ def resource_path(relative_path):
 def find_arducam_index() -> int | None:
     try:
         from cv2_enumerate_cameras import enumerate_cameras
+        import cv2
     except Exception:
         return None
     for camera_info in enumerate_cameras(cv2.CAP_DSHOW):

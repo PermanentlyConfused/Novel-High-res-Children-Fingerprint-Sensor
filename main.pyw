@@ -47,8 +47,9 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QApplication.quit()
             raise SystemExit
             # None #! Will test with the camera later
-            
-        self.initialize_rembg()
+        
+        if REMBG_ENABLE:
+            self.initialize_rembg()
         self.camera_thread = CameraThread(camera_index)
         self.camera_thread.frame_ready.connect(self._on_frame)
         self.camera_thread.start()
@@ -257,7 +258,7 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             #? convert BGR->RGB for rembg which expects RGB-like input
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            if self.rembg_session:
+            if (REMBG_ENABLE and self.rembg_session) :
                 bg_removed = remove(rgb, session=self.rembg_session)
             else:
                 bg_removed = rgb

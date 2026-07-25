@@ -1,5 +1,6 @@
 from PyQt5 import QtCore
 import cv2
+from config import *
 
 class CameraThread(QtCore.QThread):
     frame_ready = QtCore.pyqtSignal(object) 
