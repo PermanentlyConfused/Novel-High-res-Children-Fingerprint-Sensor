@@ -9,8 +9,8 @@ import subprocess
 
 import cv2
 from PIL import Image
-from rembg import remove
-from rembg.bg import new_session
+# from rembg import remove
+# from rembg.bg import new_session
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QSplashScreen
@@ -48,8 +48,8 @@ class MainWindow(QtWidgets.QMainWindow):
             raise SystemExit
             # None #! Will test with the camera later
         
-        if REMBG_ENABLE:
-            self.initialize_rembg()
+        # if REMBG_ENABLE:
+        #     self.initialize_rembg()
         self.camera_thread = CameraThread(camera_index)
         self.camera_thread.frame_ready.connect(self._on_frame)
         self.camera_thread.start()
@@ -168,14 +168,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
     #* ---------------- RemBg ----------------
-    def initialize_rembg(self):
-        u2net_path = resource_path('.u2net')
-        os.environ["U2NET_HOME"] = u2net_path
-        try:
-            self.rembg_session = new_session("u2netp")
-        except Exception as e:
-            QtWidgets.QMessageBox.warning(self, "rembg init failed", f"rembg session init failed: {e}")
-            self.rembg_session = None
+    # def initialize_rembg(self):
+    #     u2net_path = resource_path('.u2net')
+    #     os.environ["U2NET_HOME"] = u2net_path
+    #     try:
+    #         self.rembg_session = new_session("u2netp")
+    #     except Exception as e:
+    #         QtWidgets.QMessageBox.warning(self, "rembg init failed", f"rembg session init failed: {e}")
+            # self.rembg_session = None
 
     #* ---------------- Camera frame handler ----------------
     @QtCore.pyqtSlot(object)
@@ -258,10 +258,10 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             #? convert BGR->RGB for rembg which expects RGB-like input
             rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            if (REMBG_ENABLE and self.rembg_session) :
-                bg_removed = remove(rgb, session=self.rembg_session)
-            else:
-                bg_removed = rgb
+            # if (REMBG_ENABLE and self.rembg_session) :
+            #     bg_removed = remove(rgb, session=self.rembg_session)
+            # else:
+            bg_removed = rgb
         except Exception as e:
             QtWidgets.QMessageBox.information(self, "Remove Background Failed", f"Remove Background Failed: {e}")
             bg_removed = rgb
